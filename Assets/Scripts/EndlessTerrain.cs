@@ -27,7 +27,7 @@ public class EndlessTerrain : MonoBehaviour
         mapGenerator = FindObjectOfType<MapGenerator>();
 
         maxViewDist = detailLevels[detailLevels.Length - 1].visibleDistThreshold;
-        chunkSize = MapGenerator.MapChunkSize - 1;
+        chunkSize = mapGenerator.MapChunkSize - 1;
         chunkVisibleInViewDist = Mathf.RoundToInt(maxViewDist / chunkSize);
 
         UpdateVisibleChunks();
@@ -127,9 +127,6 @@ public class EndlessTerrain : MonoBehaviour
         {
             this.mapData = mapData;
             mapDataReceived = true;
-
-            Texture2D texture = TextureGenerator.TextureFromColourMap(mapData.colourMap, MapGenerator.MapChunkSize, MapGenerator.MapChunkSize);
-            meshRenderer.material.mainTexture = texture;
 
             UpdateTerrainChunk();
         }
