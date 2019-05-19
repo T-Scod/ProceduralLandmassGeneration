@@ -1,42 +1,35 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public static class MeshGenerator
 {
-    public static MeshData GenerateTerainMesh(float[,] heightMap, float heightMultiplier, AnimationCurve meshHeightCurve, int levelOfDetail, bool useFlatShading)
+    public static MeshData GenerateTerrainMesh(float[,] heightMap, MeshSettings meshSettings, int levelOfDetail)
     {
-        AnimationCurve heightCurve = new AnimationCurve(meshHeightCurve.keys);
+        int skipIncrement = (levelOfDetail == 0) ? 1 : levelOfDetail * 2;
+        int numVertsPerLine = meshSettings.NumVertsPerLine;
 
-        int meshSimplificationIncrement = (levelOfDetail == 0) ? 1 : levelOfDetail * 2;
+        Vector2 topLeft = new Vector2(-1, 1) * meshSettings.MeshWorldSize / 2.0f;
 
-        int borderedSize = heightMap.GetLength(0);
-        int meshSize = borderedSize - 2 * meshSimplificationIncrement;
-        int meshSizeUnsimplified = borderedSize - 2;
+        MeshData meshData = new MeshData(numVertsPerLine, skipIncrement, meshSettings.useFlatShading);
 
-        float topLeftX = (meshSizeUnsimplified - 1) / -2.0f;
-        float topLeftZ = (meshSizeUnsimplified - 1) / 2.0f;
-
-        int verticesPerLine = (meshSize - 1) / meshSimplificationIncrement + 1;
-
-        MeshData meshData = new MeshData(verticesPerLine, useFlatShading);
-
-        int[,] vertexIndicesMap = new int[borderedSize, borderedSize];
+        int[,] vertexIndicesMap = new int[numVertsPerLine, numVertsPerLine];
         int meshVertexIndex = 0;
-        int borderVertexIndex = -1;
+        int outOfMeshVertexIndex = -1;
 
-        for (int y = 0; y < borderedSize; y += meshSimplificationIncrement)
+        for (int y = 0; y < numVertsPerLine; y++)
         {
-            for (int x = 0; x < borderedSize; x += meshSimplificationIncrement)
+            for (int x = 0; x < numVertsPerLine; x++)
             {
-                bool isBorderVertex = y == 0 || y == borderedSize - 1 || x == 0 || x == borderedSize - 1;
-
-                if (isBorderVertex)
+                bool isOutOfMeshVertex = y == 0 || y == numVertsPerLine - 1 || x == 0 || x == numVertsPerLine - 1;
+                bool isSkippedVertex = x > 2 && x < numVertsPerLine - 3 &&
+                    y > 2 && y < numVertsPerLine - 3 &&
+                    ((x - 2) % skipIncrement != 0 || (y - 2) % skipIncrement != 0);
+                if (isOutOfMeshVertex)
                 {
-                    vertexIndicesMap[x, y] = borderVertexIndex;
-                    borderVertexIndex--;
+                    vertexIndicesMap[x, y] = outOfMeshVertexIndex;
+                    outOfMeshVertexIndex--;
                 }
-                else
+                else if (!isSkippedVertex)
                 {
                     vertexIndicesMap[x, y] = meshVertexIndex;
                     meshVertexIndex++;
@@ -44,32 +37,58 @@ public static class MeshGenerator
             }
         }
 
-        for (int y = 0; y < borderedSize; y += meshSimplificationIncrement)
+        for (int y = 0; y < numVertsPerLine; y++)
         {
-            for (int x = 0; x < borderedSize; x += meshSimplificationIncrement)
-            {
-                int vertexIndex = vertexIndicesMap[x, y];
-                Vector2 percent = new Vector2((x - meshSimplificationIncrement) / (float)meshSize, (y - meshSimplificationIncrement) / (float)meshSize);
-                float height = heightCurve.Evaluate(heightMap[x, y]) * heightMultiplier;
-                Vector3 vertexPosition = new Vector3(topLeftX + percent.x * meshSizeUnsimplified, height, topLeftZ - percent.y * meshSizeUnsimplified);
-
-                meshData.AddVertex(vertexPosition, percent, vertexIndex);
-
-                if (x < borderedSize - 1 && y < borderedSize - 1)
+            for (int x = 0; x < numVertsPerLine; x++)
+            {                
+                bool isSkippedVertex = x > 2 && x < numVertsPerLine - 3 &&
+                    y > 2 && y < numVertsPerLine - 3 &&
+                    ((x - 2) % skipIncrement != 0 || (y - 2) % skipIncrement != 0);
+                if (!isSkippedVertex)
                 {
-                    int a = vertexIndicesMap[x, y];
-                    int b = vertexIndicesMap[x + meshSimplificationIncrement, y];
-                    int c = vertexIndicesMap[x, y + meshSimplificationIncrement];
-                    int d = vertexIndicesMap[x + meshSimplificationIncrement, y + meshSimplificationIncrement];
-                    meshData.AddTriangle(a, d, c);
-                    meshData.AddTriangle(d, a, b);
-                }
+                    bool isOutOfMeshVertex = y == 0 || y == numVertsPerLine - 1 || x == 0 || x == numVertsPerLine - 1;
+                    bool isMeshEdgeVertex = (y == 1 || y == numVertsPerLine - 2 || x == 1 || x == numVertsPerLine - 2) && !isOutOfMeshVertex;
+                    bool isMainVertex = (x - 2) % skipIncrement == 0 && (y - 2) % skipIncrement == 0 && !isOutOfMeshVertex && !isMeshEdgeVertex;
+                    bool isEdgeConnectionVertex = (y == 2 || y == numVertsPerLine - 3 || x == 2 || x == numVertsPerLine - 3) && !isOutOfMeshVertex && !isMeshEdgeVertex && !isMainVertex;
 
-                vertexIndex++;
+                    int vertexIndex = vertexIndicesMap[x, y];
+                    Vector2 percent = new Vector2(x - 1, y - 1) / (numVertsPerLine - 3);
+                    Vector2 vertexPosition2D = topLeft + new Vector2(percent.x, -percent.y) * meshSettings.MeshWorldSize;
+                    float height = heightMap[x, y];
+
+                    if (isEdgeConnectionVertex)
+                    {
+                        bool isVertical = x == 2 || x == numVertsPerLine - 3;
+                        int distToMainVertexA = ((isVertical) ? y - 2 : x - 2) % skipIncrement;
+                        int distToMainVertexB = skipIncrement - distToMainVertexA;
+                        float distPercentFromAToB = distToMainVertexA / (float)skipIncrement;
+
+                        float heightOfMainVertexA = heightMap[(isVertical) ? x : x - distToMainVertexA, (isVertical) ? y - distToMainVertexA : y];
+                        float heightOfMainVertexB = heightMap[(isVertical) ? x : x + distToMainVertexB, (isVertical) ? y + distToMainVertexB : y];
+
+                        height = heightOfMainVertexA * (1 - distPercentFromAToB) + heightOfMainVertexB * distPercentFromAToB;
+                    }
+
+                    meshData.AddVertex(new Vector3(vertexPosition2D.x, height, vertexPosition2D.y), percent, vertexIndex);
+
+                    bool createTriangle = x < numVertsPerLine - 1 && y < numVertsPerLine - 1 && (!isEdgeConnectionVertex || (x != 2 && y != 2));
+
+                    if (createTriangle)
+                    {
+                        int currentIncrement = (isMainVertex && x != numVertsPerLine - 3 && y != numVertsPerLine - 3) ? skipIncrement : 1;
+
+                        int a = vertexIndicesMap[x, y];
+                        int b = vertexIndicesMap[x + currentIncrement, y];
+                        int c = vertexIndicesMap[x, y + currentIncrement];
+                        int d = vertexIndicesMap[x + currentIncrement, y + currentIncrement];
+                        meshData.AddTriangle(a, d, c);
+                        meshData.AddTriangle(d, a, b);
+                    }
+                }
             }
         }
 
-        meshData.Finalise();
+        meshData.ProcessMesh();
 
         return meshData;
     }
@@ -77,41 +96,49 @@ public static class MeshGenerator
 
 public class MeshData
 {
-    private Vector3[] vertices;
-    private int[] triangles;
-    private Vector2[] uvs;
-    private Vector3[] bakedNormals;
+    private Vector3[] m_vertices;
+    private int[] m_triangles;
+    private Vector2[] m_uvs;
+    private Vector3[] m_bakedNormals;
 
-    private Vector3[] borderVertices;
-    private int[] borderTriangles;
+    private readonly Vector3[] m_outOfMeshVertices;
+    private int[] m_outOfMeshTriangles;
 
-    private int triangleIndex;
-    private int borderTriangleIndex;
+    private int m_triangleIndex;
+    private int m_outOfMeshTriangleIndex;
 
-    private bool useFlatShading;
+    private readonly bool m_useFlatShading;
 
-    public MeshData(int verticesPerLine, bool useFlatShading)
+    public MeshData(int numVertsPerLine, int skipIncrement, bool useFlatShading)
     {
-        this.useFlatShading = useFlatShading;
+        m_useFlatShading = useFlatShading;
 
-        vertices = new Vector3[verticesPerLine * verticesPerLine];
-        uvs = new Vector2[verticesPerLine * verticesPerLine];
-        triangles = new int[(verticesPerLine - 1) * (verticesPerLine - 1) * 6];
+        int numMeshEdgeVertices = (numVertsPerLine - 2) * 4 - 4;
+        int numEdgeConnectionVertices = (skipIncrement - 1) * (numVertsPerLine - 5) / skipIncrement * 4;
+        int numMainVerticesPerLine = (numVertsPerLine - 5) / skipIncrement + 1;
+        int numMainVertices = numMainVerticesPerLine * numMainVerticesPerLine;
 
-        borderVertices = new Vector3[verticesPerLine * 4 + 4];
-        borderTriangles = new int[24 * verticesPerLine];
+        m_vertices = new Vector3[numMeshEdgeVertices + numEdgeConnectionVertices + numMainVertices];
+        m_uvs = new Vector2[m_vertices.Length];
+
+        int numMeshEgdeTriangles = 8 * (numVertsPerLine - 4);
+        int numMainTriangles = (numMainVerticesPerLine - 1) * (numMainVerticesPerLine - 1) * 2;
+        m_triangles = new int[(numMeshEgdeTriangles + numMainTriangles) * 3];
+
+        m_outOfMeshVertices = new Vector3[numVertsPerLine * 4 - 4];
+        m_outOfMeshTriangles = new int[24 * (numVertsPerLine - 2)];
     }
 
     public void AddVertex(Vector3 vertexPosition, Vector2 uv, int vertexIndex)
     {
         if (vertexIndex < 0)
         {
-            borderVertices[-vertexIndex - 1] = vertexPosition;
+            m_outOfMeshVertices[-vertexIndex - 1] = vertexPosition;
         }
         else
         {
-            vertices[vertexIndex] = vertexPosition;
-            uvs[vertexIndex] = uv;
+            m_vertices[vertexIndex] = vertexPosition;
+            m_uvs[vertexIndex] = uv;
         }
     }
 
@@ -119,30 +146,30 @@ public class MeshData
     {
         if (a < 0 || b < 0 || c < 0)
         {
-            borderTriangles[borderTriangleIndex] = a;
-            borderTriangles[borderTriangleIndex + 1] = b;
-            borderTriangles[borderTriangleIndex + 2] = c;
-            borderTriangleIndex += 3;
+            m_outOfMeshTriangles[m_outOfMeshTriangleIndex] = a;
+            m_outOfMeshTriangles[m_outOfMeshTriangleIndex + 1] = b;
+            m_outOfMeshTriangles[m_outOfMeshTriangleIndex + 2] = c;
+            m_outOfMeshTriangleIndex += 3;
         }
         else
         {
-            triangles[triangleIndex] = a;
-            triangles[triangleIndex + 1] = b;
-            triangles[triangleIndex + 2] = c;
-            triangleIndex += 3;
+            m_triangles[m_triangleIndex] = a;
+            m_triangles[m_triangleIndex + 1] = b;
+            m_triangles[m_triangleIndex + 2] = c;
+            m_triangleIndex += 3;
         }
     }
 
     private Vector3[] CalculateNormals()
     {
-        Vector3[] vertexNormals = new Vector3[vertices.Length];
-        int triangleCount = triangles.Length / 3;
+        Vector3[] vertexNormals = new Vector3[m_vertices.Length];
+        int triangleCount = m_triangles.Length / 3;
         for (int i = 0; i < triangleCount; i++)
         {
             int normalTriangleIndex = i * 3;
-            int vertexIndexA = triangles[normalTriangleIndex];
-            int vertexIndexB = triangles[normalTriangleIndex + 1];
-            int vertexIndexC = triangles[normalTriangleIndex + 2];
+            int vertexIndexA = m_triangles[normalTriangleIndex];
+            int vertexIndexB = m_triangles[normalTriangleIndex + 1];
+            int vertexIndexC = m_triangles[normalTriangleIndex + 2];
 
             Vector3 triangleNormal = SurfaceNormalFromIndices(vertexIndexA, vertexIndexB, vertexIndexC);
             vertexNormals[vertexIndexA] += triangleNormal;
@@ -150,13 +177,13 @@ public class MeshData
             vertexNormals[vertexIndexC] += triangleNormal;
         }
 
-        int borderTriangleCount = borderTriangles.Length / 3;
+        int borderTriangleCount = m_outOfMeshTriangles.Length / 3;
         for (int i = 0; i < borderTriangleCount; i++)
         {
             int normalTriangleIndex = i * 3;
-            int vertexIndexA = borderTriangles[normalTriangleIndex];
-            int vertexIndexB = borderTriangles[normalTriangleIndex + 1];
-            int vertexIndexC = borderTriangles[normalTriangleIndex + 2];
+            int vertexIndexA = m_outOfMeshTriangles[normalTriangleIndex];
+            int vertexIndexB = m_outOfMeshTriangles[normalTriangleIndex + 1];
+            int vertexIndexC = m_outOfMeshTriangles[normalTriangleIndex + 2];
 
             Vector3 triangleNormal = SurfaceNormalFromIndices(vertexIndexA, vertexIndexB, vertexIndexC);
             if (vertexIndexA >= 0)
@@ -183,18 +210,18 @@ public class MeshData
 
     private Vector3 SurfaceNormalFromIndices(int indexA, int indexB, int indexC)
     {
-        Vector3 pointA = (indexA < 0) ? borderVertices[-indexA - 1] : vertices[indexA];
-        Vector3 pointB = (indexB < 0) ? borderVertices[-indexB - 1] : vertices[indexB];
-        Vector3 pointC = (indexC < 0) ? borderVertices[-indexC - 1] : vertices[indexC];
+        Vector3 pointA = (indexA < 0) ? m_outOfMeshVertices[-indexA - 1] : m_vertices[indexA];
+        Vector3 pointB = (indexB < 0) ? m_outOfMeshVertices[-indexB - 1] : m_vertices[indexB];
+        Vector3 pointC = (indexC < 0) ? m_outOfMeshVertices[-indexC - 1] : m_vertices[indexC];
 
         Vector3 sideAB = pointB - pointA;
         Vector3 sideAC = pointC - pointA;
         return Vector3.Cross(sideAB, sideAC).normalized;
     }
 
-    public void Finalise()
+    public void ProcessMesh()
     {
-        if (useFlatShading)
+        if (m_useFlatShading)
         {
             FlatShading();
         }
@@ -206,41 +233,41 @@ public class MeshData
 
     private void BakeNormals()
     {
-        bakedNormals = CalculateNormals();
+        m_bakedNormals = CalculateNormals();
     }
 
     private void FlatShading()
     {
-        Vector3[] flatShadedVertices = new Vector3[triangles.Length];
-        Vector2[] flatShadedUvs = new Vector2[triangles.Length];
+        Vector3[] flatShadedVertices = new Vector3[m_triangles.Length];
+        Vector2[] flatShadedUvs = new Vector2[m_triangles.Length];
 
-        for (int i = 0; i < triangles.Length; i++)
+        for (int i = 0; i < m_triangles.Length; i++)
         {
-            flatShadedVertices[i] = vertices[triangles[i]];
-            flatShadedUvs[i] = uvs[triangles[i]];
-            triangles[i] = i;
+            flatShadedVertices[i] = m_vertices[m_triangles[i]];
+            flatShadedUvs[i] = m_uvs[m_triangles[i]];
+            m_triangles[i] = i;
         }
 
-        vertices = flatShadedVertices;
-        uvs = flatShadedUvs;
+        m_vertices = flatShadedVertices;
+        m_uvs = flatShadedUvs;
     }
 
     public Mesh CreateMesh()
     {
         Mesh mesh = new Mesh
         {
-            vertices = vertices,
-            triangles = triangles,
-            uv = uvs
+            vertices = m_vertices,
+            triangles = m_triangles,
+            uv = m_uvs
         };
 
-        if (useFlatShading)
+        if (m_useFlatShading)
         {
             mesh.RecalculateNormals();
         }
         else
         {
-            mesh.normals = bakedNormals;
+            mesh.normals = m_bakedNormals;
         }
 
         return mesh;
