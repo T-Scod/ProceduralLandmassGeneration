@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Linq;
 
 /// <summary>
@@ -73,7 +72,7 @@ public class TextureSettings : UpdatableData
     /// Generates a Texture2DArray from a Texture2D[].
     /// </summary>
     /// <param name="textures">The array of textures that is being turned into a texture array.</param>
-    /// <returns></returns>
+    /// <returns>A texture array from the array of textures.</returns>
     private Texture2DArray GenerateTextureArray(Texture2D[] textures)
     {
         // creates a new texture array based on the texture settings
