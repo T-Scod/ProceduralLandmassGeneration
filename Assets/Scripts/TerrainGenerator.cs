@@ -3,9 +3,6 @@ using UnityEngine;
 
 public class TerrainGenerator : MonoBehaviour
 {
-    private const float m_viewerMoveThresholdForChunkUpdate = 25.0f;
-    private const float m_sqrViewerMoveThresholdForChunkUpdate = m_viewerMoveThresholdForChunkUpdate * m_viewerMoveThresholdForChunkUpdate;
-
     public int colliderLODIndex;
     public LODInfo[] detailLevels;
 
@@ -15,6 +12,9 @@ public class TerrainGenerator : MonoBehaviour
 
     public Transform viewer;
     public Material mapMaterial;
+
+    private const float m_viewerMoveThresholdForChunkUpdate = 25.0f;
+    private const float m_sqrViewerMoveThresholdForChunkUpdate = m_viewerMoveThresholdForChunkUpdate * m_viewerMoveThresholdForChunkUpdate;
 
     private Vector2 m_viewerPosition;
     private Vector2 m_viewerPositionOld;

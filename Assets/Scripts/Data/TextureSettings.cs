@@ -8,6 +8,11 @@ using System.Linq;
 public class TextureSettings : UpdatableData
 {
     /// <summary>
+    /// The different layers of textures.
+    /// </summary>
+    public Layer[] layers;
+
+    /// <summary>
     /// Size of the texture.
     /// </summary>
     private const int m_textureSize = 512;
@@ -15,12 +20,6 @@ public class TextureSettings : UpdatableData
     /// Format of the texture.
     /// </summary>
     private const TextureFormat m_textureFormat = TextureFormat.RGB565;
-
-    /// <summary>
-    /// The different layers of textures.
-    /// </summary>
-    public Layer[] layers;
-
     /// <summary>
     /// Minimum height of the mesh
     /// </summary>
