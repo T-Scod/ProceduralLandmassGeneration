@@ -6,84 +6,84 @@
 public class TerrainChunk
 {
     /// <summary>
-    /// 
+    /// Callback that determines if the chunk's visibility was changed.
     /// </summary>
     public event System.Action<TerrainChunk, bool> OnVisibilityChanged;
     /// <summary>
-    /// 
+    /// Used to check if a terrain chunk has been looped over.
     /// </summary>
     public Vector2 coord;
 
     /// <summary>
-    /// 
+    /// The distance that colliders generate within.
     /// </summary>
     private const float m_colliderGenerationDistThreshold = 5.0f;
     /// <summary>
-    /// 
+    /// The terrain chunk object.
     /// </summary>
     private GameObject m_meshObject;
     /// <summary>
-    /// 
+    /// The center of the terrain.
     /// </summary>
     private Vector2 m_sampleCenter;
     /// <summary>
-    /// 
+    /// Box around the terrain from the position of the viewer.
     /// </summary>
     private Bounds m_bounds;
     /// <summary>
-    /// 
+    /// Used to display the mesh.
     /// </summary>
     private MeshRenderer m_meshRenderer;
     /// <summary>
-    /// 
+    /// Stores the generated mesh.
     /// </summary>
     private MeshFilter m_meshFilter;
     /// <summary>
-    /// 
+    /// Stores the generated mesh collider.
     /// </summary>
     private MeshCollider m_meshCollider;
     /// <summary>
-    /// 
+    /// Collection of the different used detail levels.
     /// </summary>
     private LODInfo[] m_detailLevels;
     /// <summary>
-    /// 
+    /// Collection of different level of detail meshes.
     /// </summary>
     private readonly LODMesh[] m_lodMeshes;
     /// <summary>
-    /// 
+    /// The level of detail index for colliders.
     /// </summary>
     private readonly int m_colliderLODIndex;
     /// <summary>
-    /// 
+    /// Stores the generated height map to then use to generate a mesh.
     /// </summary>
     private HeightMap m_heightMap;
     /// <summary>
-    /// 
+    /// Determines if a height map was received.
     /// </summary>
     private bool m_heightMapReceived;
     /// <summary>
-    /// 
+    /// The previous level of detail index.
     /// </summary>
     private int m_previousLODIndex = -1;
     /// <summary>
-    /// 
+    /// Determines if a collider has been set to the mesh.
     /// </summary>
     private bool m_hasSetCollider;
     /// <summary>
-    /// 
+    /// The maximum distance the viewer can see.
     /// </summary>
     private readonly float m_maxViewDist;
     /// <summary>
-    /// 
+    /// Settings to vary the generated heights of the terrain.
     /// </summary>
     private readonly HeightMapSettings m_heightMapSettings;
     /// <summary>
-    /// 
+    /// Setteings to vary the generated mesh.
     /// </summary>
     private MeshSettings m_meshSettings;
     /// <summary>
-    /// 
+    /// The object that the terrain is being built around.
     /// </summary>
     private Transform m_viewer;
 
@@ -194,7 +194,7 @@ public class TerrainChunk
             // gets if the chunk is visible
             bool visible = viewerDistFromNearestEdge <= m_maxViewDist;
 
-            // c
+            // checks if the chunk is visible
             if (visible)
             {
                 // the level of detail of the mesh
